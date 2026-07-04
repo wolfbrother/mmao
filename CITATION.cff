@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: "MMAO: Metabolic Multi-Agent Optimization Framework"
+message: "If you use this repository or the mmao-opt package, please cite the software and the foundational MMAO paper."
+type: software
+authors:
+  - family-names: "Xu"
+    given-names: "Jinliang"
+    email: "jlxufly@gmail.com"
+  - family-names: "Ma"
+    given-names: "Liping"
+    email: "lipingmaqzx@163.com"
+repository-code: "https://github.com/wolfbrother/mmao"
+url: "https://github.com/wolfbrother/mmao"
+license: "MIT"
+version: "0.1.0"
+date-released: "2026-07-04"
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Xu"
+      given-names: "Jinliang"
+    - family-names: "Ma"
+      given-names: "Liping"
+  title: "MMAO: A Metabolic Multi-Agent Optimizer with Endogenous Resource Allocation for Continuous and Discrete Optimization"
+  journal: "arXiv"
+  year: 2026
+  article-number: "2606.28109"
+  url: "https://arxiv.org/abs/2606.28109"
