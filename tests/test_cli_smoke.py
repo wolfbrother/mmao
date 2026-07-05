@@ -95,3 +95,28 @@ def test_cli_bundled_benchmarks_smoke() -> None:
     )
     mkp_payload = json.loads(mkp_result.stdout)
     assert mkp_payload["problem"].startswith("ORL-MKP-")
+
+
+def test_cli_classification_smoke() -> None:
+    repo = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mmao.cli",
+            "classification",
+            "--dataset",
+            "breast_cancer",
+            "--classifier",
+            "svm_rbf",
+            "--iterations",
+            "4",
+            "--summary-only",
+        ],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    payload = json.loads(result.stdout)
+    assert "test_metric" in payload

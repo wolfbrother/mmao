@@ -12,8 +12,8 @@ authors:
 repository-code: "https://github.com/wolfbrother/mmao"
 url: "https://github.com/wolfbrother/mmao"
 license: "MIT"
-version: "0.1.0"
-date-released: "2026-07-04"
+version: "0.2.0"
+date-released: "2026-07-05"
 preferred-citation:
   type: article
   authors:

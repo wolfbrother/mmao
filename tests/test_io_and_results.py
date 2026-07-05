@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
+import pytest
+
 from mmao.api import optimize_knapsack
 from mmao.examples import demo_knapsack_problem
 from mmao.io import (
@@ -12,8 +15,9 @@ from mmao.io import (
     load_bundled_tsplib_problem,
     load_orlib_mkp_instance,
     load_orlib_mkp_instances,
+    load_tsplib_problem,
 )
-from mmao.results import summarize_result, write_result_json
+from mmao.results import summarize_result, to_jsonable, write_result_json
 
 
 def test_orlib_loader_smoke() -> None:
@@ -34,6 +38,13 @@ def test_bundled_benchmarks_smoke() -> None:
     assert mkp.item_count > 0
 
 
+def test_short_benchmark_names_resolve_to_bundled_files() -> None:
+    tsp = load_tsplib_problem("berlin52.tsp")
+    mkp = load_orlib_mkp_instance("mknap2.txt", 0)
+    assert tsp.name.lower() == "berlin52"
+    assert mkp.name.startswith("ORL-MKP-")
+
+
 def test_result_summary_and_export(tmp_path: Path) -> None:
     result = optimize_knapsack(demo_knapsack_problem())
     summary = summarize_result(result)
@@ -43,3 +54,21 @@ def test_result_summary_and_export(tmp_path: Path) -> None:
     write_result_json(result, output)
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["best_profit"] == result["best_profit"]
+
+
+def test_to_jsonable_handles_numpy_values() -> None:
+    payload = {
+        "vector": np.array([1, 2, 3]),
+        "scalar": np.float64(1.5),
+        "nested": {"mask": np.array([0, 1])},
+    }
+    converted = to_jsonable(payload)
+    assert converted == {"vector": [1, 2, 3], "scalar": 1.5, "nested": {"mask": [0, 1]}}
+
+
+def test_missing_file_errors_are_user_friendly() -> None:
+    with pytest.raises(FileNotFoundError, match="Provide a real local \\.tsp file path"):
+        load_tsplib_problem("path/to/berlin52.tsp")
+
+    with pytest.raises(FileNotFoundError, match="Provide a real local \\.txt file path"):
+        load_orlib_mkp_instance("path/to/mknap2.txt", 0)

@@ -1,12 +1,30 @@
 from __future__ import annotations
 
+from importlib.resources import files
 from pathlib import Path
 
 from ..discrete.knapsack import KnapsackProblem
 
 
+def _resolve_orlib_path(path: str | Path) -> Path:
+    file_path = Path(path)
+    if file_path.exists():
+        return file_path
+
+    normalized = str(path).strip().lower().replace("\\", "/")
+    if normalized in {"mknap2", "mknap2.txt"}:
+        return Path(str(files("mmao.data.orlib").joinpath("mknap2.txt")))
+
+    raise FileNotFoundError(
+        f"OR-Library file not found: {path}. Provide a real local .txt file path, use "
+        "'load_bundled_orlib_mkp_instance(\"mknap2\", index=0)' in Python, or use "
+        "'mmao knapsack --benchmark mknap2 --instance-index 0 --summary-only' for the bundled example."
+    )
+
+
 def load_orlib_mkp_instances(path: str | Path, *, limit: int | None = None) -> list[KnapsackProblem]:
-    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    file_path = _resolve_orlib_path(path)
+    lines = file_path.read_text(encoding="utf-8").splitlines()
     cleaned_lines: list[str] = []
     for raw_line in lines:
         line = raw_line.split("//", 1)[0].strip()

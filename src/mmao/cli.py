@@ -8,7 +8,7 @@ from .continuous import MMAOContinuousConfig, optimize_continuous_problem, rastr
 from .discrete import MMAOKnapsackConfig, MMAOTSPConfig, optimize_knapsack_problem, optimize_tsp_problem
 from .dynamic import DynamicOptimizationProblem, MMAODynamicConfig, make_dynamic_problem, optimize_dynamic_problem
 from .examples import demo_knapsack_problem, demo_tsp_problem
-from .results import summarize_result, write_result_json
+from .results import summarize_result, to_jsonable, write_result_json
 
 
 def add_common_output_args(subparser: argparse.ArgumentParser) -> None:
@@ -114,7 +114,7 @@ def main() -> None:
         write_result_json(result, args.output)
 
     payload = summarize_result(result) if args.summary_only else result
-    print(json.dumps(payload, indent=2, default=float))
+    print(json.dumps(to_jsonable(payload), indent=2))
 
 
 if __name__ == "__main__":
