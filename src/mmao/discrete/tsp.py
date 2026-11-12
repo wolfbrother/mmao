@@ -1,3 +1,21 @@
+# Copyright (c) 2026 Jinliang Xu
+# Author: Jinliang Xu
+# Email: jlxufly@gmail.com
+# Email: xujinliang@caict.ac.cn
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,6 +23,7 @@ import math
 import random
 
 from ..common import clamp, median_upper_scale
+from ..common.validation import finite_number, validate_config
 
 
 @dataclass(frozen=True)
@@ -13,6 +32,23 @@ class TSPProblem:
     distance_matrix: list[list[float]]
     coordinates: list[tuple[float, float]] | None = None
     known_optimum: float | None = None
+
+    def __post_init__(self) -> None:
+        size = len(self.distance_matrix)
+        if size < 3 or any(len(row) != size for row in self.distance_matrix):
+            raise ValueError("TSP requires a square distance matrix with at least 3 cities.")
+        if any(not math.isfinite(value) or value < 0 for row in self.distance_matrix for value in row):
+            raise ValueError("Distances must be finite and nonnegative.")
+        if self.coordinates is not None and len(self.coordinates) != size:
+            raise ValueError("Coordinates must contain one pair per city.")
+        if self.coordinates is not None:
+            for pair in self.coordinates:
+                if len(pair) != 2:
+                    raise ValueError("Coordinates must contain one pair per city.")
+                for value in pair:
+                    finite_number("coordinate", value)
+        if self.known_optimum is not None:
+            finite_number("known_optimum", self.known_optimum)
 
     @property
     def city_count(self) -> int:
@@ -182,7 +218,8 @@ def make_agent(
 
 
 def optimize_tsp_problem(problem: TSPProblem, config: MMAOTSPConfig) -> dict[str, object]:
-    rng = random.Random(config.seed)
+    validate_config(config)
+    rng = random.Random(int(config.seed))
     agents = [
         make_agent(problem, rng, config)
         for _ in range(max(config.initial_agents, config.minimum_agents))
@@ -190,13 +227,20 @@ def optimize_tsp_problem(problem: TSPProblem, config: MMAOTSPConfig) -> dict[str
     resource_pool = max(0.0, config.initial_pool)
     recent_gains: list[float] = []
     history: list[dict[str, float | int]] = []
+    best_agent = min(agents, key=lambda agent: agent.best_distance)
+    best_distance = best_agent.best_distance
+    best_route = best_agent.best_route[:]
 
     def record(iteration: int) -> None:
+        nonlocal best_distance, best_route
         best_agent = min(agents, key=lambda agent: agent.best_distance)
+        if best_agent.best_distance < best_distance:
+            best_distance = best_agent.best_distance
+            best_route = best_agent.best_route[:]
         history.append(
             {
                 "iteration": iteration,
-                "best_distance": float(best_agent.best_distance),
+                "best_distance": float(best_distance),
                 "resource_pool": float(resource_pool),
                 "success_rate": float(sum(1 for agent in agents if agent.last_gain > 0.0) / len(agents)),
                 "mean_role": float(sum(agent.role for agent in agents) / len(agents)),
@@ -283,6 +327,10 @@ def optimize_tsp_problem(problem: TSPProblem, config: MMAOTSPConfig) -> dict[str
 
             recent_gains.append(raw_gain)
 
+        record_best = min(agents, key=lambda agent: agent.best_distance)
+        if record_best.best_distance < best_distance:
+            best_distance = record_best.best_distance
+            best_route = record_best.best_route[:]
         removable = [agent for agent in agents if agent.energy <= 0.05]
         for agent in removable:
             if len(agents) <= config.minimum_agents:
@@ -342,10 +390,9 @@ def optimize_tsp_problem(problem: TSPProblem, config: MMAOTSPConfig) -> dict[str
 
         record(iteration)
 
-    best_agent = min(agents, key=lambda agent: agent.best_distance)
     return {
         "problem": problem.name,
-        "best_route": best_agent.best_route[:],
-        "best_distance": float(best_agent.best_distance),
+        "best_route": best_route,
+        "best_distance": float(best_distance),
         "history": history,
     }

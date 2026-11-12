@@ -1,6 +1,24 @@
+# Copyright (c) 2026 Jinliang Xu
+# Author: Jinliang Xu
+# Email: jlxufly@gmail.com
+# Email: xujinliang@caict.ac.cn
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 cff-version: 1.2.0
 title: "MMAO: Metabolic Multi-Agent Optimization Framework"
-message: "If you use this repository or the mmao-opt package, please cite the software and the foundational MMAO paper."
+message: "Please cite this software and the IEEE Access article. See references.bib for the foundational and domain-specific research context."
 type: software
 authors:
   - family-names: "Xu"
@@ -11,18 +29,27 @@ authors:
     email: "lipingmaqzx@163.com"
 repository-code: "https://github.com/wolfbrother/mmao"
 url: "https://github.com/wolfbrother/mmao"
-license: "MIT"
-version: "0.2.0"
-date-released: "2026-07-05"
+license: "Apache-2.0"
+version: "1.0.1"
 preferred-citation:
   type: article
   authors:
     - family-names: "Xu"
       given-names: "Jinliang"
+    - family-names: "Li"
+      given-names: "Bingqi"
     - family-names: "Ma"
       given-names: "Liping"
-  title: "MMAO: A Metabolic Multi-Agent Optimizer with Endogenous Resource Allocation for Continuous and Discrete Optimization"
-  journal: "arXiv"
+    - family-names: "Zhu"
+      given-names: "Runkai"
+    - family-names: "Nie"
+      given-names: "Fanjie"
+    - family-names: "Li"
+      given-names: "Jin"
+  title: "MMAO: A Unified Resource-Regulated Controller for Cross-Domain Optimization"
+  journal: "IEEE Access"
   year: 2026
-  article-number: "2606.28109"
-  url: "https://arxiv.org/abs/2606.28109"
+  start: 1
+  end: 12
+  doi: "10.1109/ACCESS.2026.3752083"
+  url: "https://ieeexplore.ieee.org/document/11783402"

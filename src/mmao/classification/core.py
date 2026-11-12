@@ -1,3 +1,21 @@
+# Copyright (c) 2026 Jinliang Xu
+# Author: Jinliang Xu
+# Email: jlxufly@gmail.com
+# Email: xujinliang@caict.ac.cn
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,6 +23,7 @@ import math
 
 import numpy as np
 from sklearn.feature_selection import mutual_info_classif
+from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import balanced_accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
@@ -12,18 +31,33 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
+from sklearn.utils.validation import check_X_y
+from sklearn.utils.multiclass import check_classification_targets
 
 from .datasets import load_builtin_dataset
+from ..common.validation import validate_config
 
 
 @dataclass(frozen=True)
 class ClassificationProblem:
     name: str
-    dataset_name: str
+    dataset_name: str | None = None
     classifier_name: str = "svm_rbf"
     metric: str = "balanced_accuracy"
+    x: np.ndarray | None = None
+    y: np.ndarray | None = None
 
     def load(self) -> tuple[np.ndarray, np.ndarray]:
+        if self.x is not None or self.y is not None:
+            if self.x is None or self.y is None or self.dataset_name is not None:
+                raise ValueError("Supply both x and y, or a dataset_name.")
+            x, y = check_X_y(self.x, self.y)
+            check_classification_targets(y)
+            if np.unique(y).size < 2:
+                raise ValueError("Classification requires at least two classes.")
+            return x, y
+        if self.dataset_name is None:
+            raise ValueError("Supply a dataset_name or both x and y.")
         return load_builtin_dataset(self.dataset_name)
 
 
@@ -42,6 +76,7 @@ class MMAOClassificationConfig:
     feature_penalty: float = 0.08
     social_pull: float = 0.22
     prior_pull: float = 0.20
+    return_model: bool = False
 
 
 def split_dataset(
@@ -66,13 +101,15 @@ def metric_score(metric: str, y_true: np.ndarray, y_pred: np.ndarray) -> float:
     raise ValueError(f"Unsupported metric: {metric}")
 
 
-def build_estimator(classifier_name: str, params: np.ndarray):
+def build_estimator(classifier_name: str, params: np.ndarray, *, max_neighbors: int | None = None):
     if classifier_name == "svm_rbf":
         c = float(10 ** np.clip(params[0], -2.0, 2.5))
         gamma = float(10 ** np.clip(params[1], -4.0, 1.0))
         return Pipeline([("scaler", StandardScaler()), ("clf", SVC(C=c, gamma=gamma, kernel="rbf"))])
     if classifier_name == "knn":
         n_neighbors = int(np.clip(round(1 + (params[0] + 2.0) / 4.0 * 14), 1, 15))
+        if max_neighbors is not None:
+            n_neighbors = min(n_neighbors, max_neighbors)
         weights = "distance" if params[1] > 0.0 else "uniform"
         return Pipeline([("scaler", StandardScaler()), ("clf", KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights))])
     if classifier_name == "logreg":
@@ -145,7 +182,7 @@ def evaluate_candidate(
     n_features = x_train.shape[1]
     raw_mask, params = decode(candidate, n_features)
     mask = repair_mask(candidate[:n_features], feature_priors, minimum_feature_count) if int(raw_mask.sum()) < minimum_feature_count else raw_mask
-    estimator = build_estimator(classifier_name, params)
+    estimator = build_estimator(classifier_name, params, max_neighbors=len(x_train))
     estimator.fit(x_train[:, mask], y_train)
     train_pred = estimator.predict(x_train[:, mask])
     val_pred = estimator.predict(x_val[:, mask])
@@ -174,16 +211,33 @@ def evaluate_final_model(
     y_test: np.ndarray,
     metric: str,
     classifier_name: str,
-) -> dict[str, float]:
+    selected_mask: np.ndarray | None = None,
+    return_model: bool = False,
+    max_neighbors: int | None = None,
+) -> dict[str, object]:
     mask, params = decode(candidate, x_trainval.shape[1])
-    estimator = build_estimator(classifier_name, params)
-    estimator.fit(x_trainval[:, mask], y_trainval)
-    y_pred = estimator.predict(x_test[:, mask])
-    return {
+    if selected_mask is not None:
+        mask = np.asarray(selected_mask, dtype=bool)
+        if mask.shape != (x_trainval.shape[1],) or not mask.any():
+            raise ValueError("selected_mask must select at least one input feature.")
+    neighbor_limit = len(x_trainval) if max_neighbors is None else min(len(x_trainval), max_neighbors)
+    estimator = build_estimator(classifier_name, params, max_neighbors=neighbor_limit)
+    model = Pipeline([
+        ("features", ColumnTransformer([("selected", "passthrough", np.flatnonzero(mask))])),
+        ("estimator", estimator),
+    ])
+    model.fit(x_trainval, y_trainval)
+    y_pred = model.predict(x_test)
+    result = {
         "test_metric": metric_score(metric, y_test, y_pred),
         "test_feature_ratio": float(mask.sum() / x_trainval.shape[1]),
         "test_selected_features": float(mask.sum()),
+        "selected_feature_indices": np.flatnonzero(mask).tolist(),
+        "classifier_parameters": estimator.named_steps["clf"].get_params(deep=False),
     }
+    if return_model:
+        result["model"] = model
+    return result
 
 
 def consensus_from_elites(elites: list[dict[str, object]], n_features: int) -> np.ndarray:
@@ -207,7 +261,6 @@ def elite_refine(
     minimum_feature_count: int,
     feature_priors: np.ndarray,
 ) -> tuple[np.ndarray, dict[str, float | np.ndarray]]:
-    n_features = x_train.shape[1]
     best_candidate = candidate.copy()
     best_outcome = outcome
     mask = np.asarray(outcome["mask"], dtype=int)
@@ -284,6 +337,13 @@ def mutate_position(
 
 
 def optimize_classification_problem(problem: ClassificationProblem, config: MMAOClassificationConfig) -> dict[str, object]:
+    validate_config(config, minimum_iterations=1)
+    if config.seed > 2**32 - 102:
+        raise ValueError("Classification seed must be <= 2**32 - 102 for dataset splitting.")
+    if problem.classifier_name not in {"svm_rbf", "knn", "logreg"}:
+        raise ValueError(f"Unsupported classifier: {problem.classifier_name}")
+    if problem.metric not in {"balanced_accuracy", "f1_macro"}:
+        raise ValueError(f"Unsupported metric: {problem.metric}")
     rng = np.random.default_rng(config.seed)
     x, y = problem.load()
     param_dims = 2 if problem.classifier_name != "logreg" else 1
@@ -395,8 +455,9 @@ def optimize_classification_problem(problem: ClassificationProblem, config: MMAO
             )
             communal_budget -= config.offspring_cost
 
-        best_objective = max(objectives) if objectives else (float(global_best["objective"]) if global_best is not None else -math.inf)
-        mean_feature_ratio = float(np.mean([np.mean(np.asarray(agent["mask"])) for agent in agents])) if agents else 0.0
+        best_objective = float(global_best["objective"]) if global_best is not None else -math.inf
+        evaluated_masks = [np.asarray(agent["mask"]) for agent in agents if np.any(agent["mask"])]
+        mean_feature_ratio = float(np.mean([mask.mean() for mask in evaluated_masks])) if evaluated_masks else 0.0
         history.append(
             {
                 "iteration": iteration,
@@ -404,6 +465,8 @@ def optimize_classification_problem(problem: ClassificationProblem, config: MMAO
                 "population": float(len(agents)),
                 "communal_budget": float(communal_budget),
                 "mean_feature_ratio": mean_feature_ratio,
+                "evaluated_population": len(evaluated_masks),
+                "mean_role": float(np.mean([float(agent["role"]) for agent in agents])),
                 "target_feature_ratio": target_ratio,
             }
         )
@@ -419,5 +482,8 @@ def optimize_classification_problem(problem: ClassificationProblem, config: MMAO
         y_test,
         problem.metric,
         problem.classifier_name,
+        selected_mask=np.asarray(global_best["mask"]),
+        return_model=config.return_model,
+        max_neighbors=len(x_train),
     )
     return {"problem": problem.name, "history": history, **global_best, **final_eval}

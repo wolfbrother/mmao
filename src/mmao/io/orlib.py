@@ -1,9 +1,29 @@
+# Copyright (c) 2026 Jinliang Xu
+# Author: Jinliang Xu
+# Email: jlxufly@gmail.com
+# Email: xujinliang@caict.ac.cn
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import annotations
 
 from importlib.resources import files
 from pathlib import Path
+from numbers import Integral
 
 from ..discrete.knapsack import KnapsackProblem
+from ..common.validation import integer
 
 
 def _resolve_orlib_path(path: str | Path) -> Path:
@@ -23,6 +43,8 @@ def _resolve_orlib_path(path: str | Path) -> Path:
 
 
 def load_orlib_mkp_instances(path: str | Path, *, limit: int | None = None) -> list[KnapsackProblem]:
+    if limit is not None:
+        integer("limit", limit)
     file_path = _resolve_orlib_path(path)
     lines = file_path.read_text(encoding="utf-8").splitlines()
     cleaned_lines: list[str] = []
@@ -43,7 +65,7 @@ def load_orlib_mkp_instances(path: str | Path, *, limit: int | None = None) -> l
             int(tokens[index])
             int(tokens[index + 1])
             break
-        except Exception:
+        except (ValueError, IndexError):
             index += 1
 
     while index + 2 <= len(tokens):
@@ -55,7 +77,10 @@ def load_orlib_mkp_instances(path: str | Path, *, limit: int | None = None) -> l
             continue
         index += 2
         if constraint_count <= 0 or item_count <= 0:
-            break
+            raise ValueError(f"Invalid OR-Library dimensions in instance {instance_id}.")
+        required = item_count + constraint_count + constraint_count * item_count + 1
+        if len(tokens) - index < required:
+            raise ValueError(f"Truncated OR-Library instance {instance_id} in {file_path}.")
 
         profits = [int(tokens[index + offset]) for offset in range(item_count)]
         index += item_count
@@ -81,10 +106,14 @@ def load_orlib_mkp_instances(path: str | Path, *, limit: int | None = None) -> l
         if limit is not None and len(instances) >= limit:
             break
 
+    if not instances:
+        raise ValueError(f"No OR-Library MKP instances found in {file_path}.")
     return instances
 
 
 def load_orlib_mkp_instance(path: str | Path, index: int = 0) -> KnapsackProblem:
+    if isinstance(index, bool) or not isinstance(index, Integral):
+        raise ValueError("index must be an integer.")
     instances = load_orlib_mkp_instances(path, limit=None)
     if index < 0 or index >= len(instances):
         raise IndexError(f"Requested OR-Library instance index {index}, but only {len(instances)} instances were loaded.")

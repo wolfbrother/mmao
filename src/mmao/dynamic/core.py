@@ -1,3 +1,21 @@
+# Copyright (c) 2026 Jinliang Xu
+# Author: Jinliang Xu
+# Email: jlxufly@gmail.com
+# Email: xujinliang@caict.ac.cn
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,11 +28,11 @@ from ..continuous.core import (
     clip_position,
     init_agent,
     mean_position,
-    optimize_continuous_problem,
     random_unit_vector,
 )
 from ..continuous.benchmarks import ContinuousProblem, rastrigin, sphere
 from .benchmarks import DynamicScenario
+from ..common.validation import finite_number, integer, validate_bounds, validate_config
 
 
 Vector = list[float]
@@ -26,6 +44,17 @@ class DynamicOptimizationProblem:
     scenario: DynamicScenario
     bounds: list[tuple[float, float]]
     optimum_value: float = 0.0
+
+    def __post_init__(self) -> None:
+        validate_bounds(self.scenario.dimension, self.bounds)
+        finite_number("optimum_value", self.optimum_value)
+        integer("change_frequency", self.scenario.change_frequency)
+        if self.name != self.scenario.name:
+            raise ValueError("Problem and scenario names must match.")
+        if self.name not in {"dyn-sphere", "dyn-rastrigin", "dyn-ackley"}:
+            raise ValueError("Unsupported dynamic objective.")
+        if not math.isfinite(self.scenario.change_severity) or self.scenario.change_severity < 0:
+            raise ValueError("change_severity must be finite and nonnegative.")
 
 
 @dataclass
@@ -72,7 +101,8 @@ def evaluate_dynamic(problem_name: str, position: Vector, shift: Vector) -> floa
 
 
 def optimize_dynamic_problem(problem: DynamicOptimizationProblem, config: MMAODynamicConfig) -> dict[str, object]:
-    rng = random.Random(config.seed)
+    validate_config(config)
+    rng = random.Random(int(config.seed))
     dimensions = problem.scenario.dimension
     spans = [upper - lower for lower, upper in problem.bounds]
 
@@ -121,7 +151,7 @@ def optimize_dynamic_problem(problem: DynamicOptimizationProblem, config: MMAODy
                 agent.fitness = memory_fit
             else:
                 agent.best_position = list(agent.position)
-                agent.best_fitness = agent.fitness
+            agent.best_fitness = agent.fitness
             if agent.fitness < best_fitness:
                 best_fitness = agent.fitness
                 best_position = list(agent.position)
@@ -308,6 +338,10 @@ def optimize_dynamic_problem(problem: DynamicOptimizationProblem, config: MMAODy
 
         survivors = []
         spawned = []
+        surviving_count = sum(
+            not (agent.energy < 0.24 * reserve_target * (1.0 + 0.20 * crowding + 0.35 * recovery_pressure) and agent.stagnation > 1)
+            for agent, _, _, reserve_target in evaluations
+        )
         for agent, improvement, local_spread, reserve_target in evaluations:
             death_floor = 0.24 * reserve_target * (1.0 + 0.20 * crowding + 0.35 * recovery_pressure)
             if agent.energy < death_floor and agent.stagnation > 1:
@@ -316,7 +350,7 @@ def optimize_dynamic_problem(problem: DynamicOptimizationProblem, config: MMAODy
 
             survivors.append(agent)
             surplus = agent.energy - reserve_target
-            free_slots = static_config.maximum_agents - (len(survivors) + len(spawned))
+            free_slots = static_config.maximum_agents - (surviving_count + len(spawned))
             if improvement > 0.0 and surplus > 0.10 * reserve_target and resource_pool > 0.30 * reserve_target and free_slots > 0:
                 subsidy = min((0.26 + 0.14 * config.reinvestment_bias) * reserve_target, resource_pool)
                 parent_share = min(0.22 * reserve_target, 0.22 * agent.energy)
@@ -389,6 +423,6 @@ def optimize_dynamic_problem(problem: DynamicOptimizationProblem, config: MMAODy
         "problem": problem.name,
         "best_fitness": best_fitness,
         "best_position": best_position,
-        "offline_error": sum(offline_errors) / max(1, len(offline_errors)),
+        "offline_error": sum(offline_errors) / len(offline_errors) if offline_errors else best_fitness - problem.optimum_value,
         "history": history,
     }

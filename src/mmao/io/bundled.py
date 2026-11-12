@@ -1,7 +1,26 @@
+# Copyright (c) 2026 Jinliang Xu
+# Author: Jinliang Xu
+# Email: jlxufly@gmail.com
+# Email: xujinliang@caict.ac.cn
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import annotations
 
 from importlib.resources import files
 from pathlib import Path
+import math
 
 from ..discrete.tsp import TSPProblem
 from .orlib import load_orlib_mkp_instance
@@ -46,7 +65,7 @@ def load_bundled_tsplib_problem(name: str = "berlin52"):
         for x1, y1 in coordinates:
             row: list[float] = []
             for x2, y2 in coordinates:
-                row.append(round(((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5))
+                row.append(math.floor(math.hypot(x2 - x1, y2 - y1) + 0.5))
             matrix.append(row)
         return TSPProblem(
             name="berlin52",

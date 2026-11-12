@@ -1,3 +1,21 @@
+# Copyright (c) 2026 Jinliang Xu
+# Author: Jinliang Xu
+# Email: jlxufly@gmail.com
+# Email: xujinliang@caict.ac.cn
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,6 +23,7 @@ import math
 import random
 
 from ..common import clamp, median_upper_scale
+from ..common.validation import finite_number, validate_config
 
 
 @dataclass(frozen=True)
@@ -14,6 +33,19 @@ class KnapsackProblem:
     weights: list[list[int]]
     capacities: list[int]
     known_optimum: int | None = None
+
+    def __post_init__(self) -> None:
+        if len(self.profits) == 0 or len(self.capacities) == 0 or len(self.weights) != len(self.capacities):
+            raise ValueError("Provide nonempty profits and one weight row per capacity.")
+        if any(len(row) != len(self.profits) for row in self.weights):
+            raise ValueError("Each weight row must contain one value per item.")
+        values = [*self.profits, *self.capacities, *(value for row in self.weights for value in row)]
+        for value in values:
+            finite_number("profit, weight, or capacity", value)
+            if value < 0:
+                raise ValueError("Profits, weights, and capacities must be nonnegative.")
+        if self.known_optimum is not None:
+            finite_number("known_optimum", self.known_optimum)
 
     @property
     def item_count(self) -> int:
@@ -230,7 +262,10 @@ def init_agent(
 
 
 def optimize_knapsack_problem(problem: KnapsackProblem, config: MMAOKnapsackConfig) -> dict[str, object]:
-    rng = random.Random(config.seed)
+    validate_config(config)
+    if config.fixed_role is not None and not 0 <= config.fixed_role <= 1:
+        raise ValueError("fixed_role must be between 0 and 1.")
+    rng = random.Random(int(config.seed))
     order, rank = build_density_rank(problem)
     population = [init_agent(problem, config, rng, order, rank) for _ in range(config.initial_agents)]
     best_agent = max(population, key=lambda agent: agent.profit)
@@ -339,6 +374,10 @@ def optimize_knapsack_problem(problem: KnapsackProblem, config: MMAOKnapsackConf
 
         survivors: list[KnapsackAgent] = []
         spawned: list[KnapsackAgent] = []
+        surviving_count = sum(
+            not (agent.energy < 0.22 * reserve_target * (1.0 + 0.22 * crowding) and agent.stagnation > 1)
+            for agent, _, reserve_target in evaluations
+        )
         for agent, improvement, reserve_target in evaluations:
             death_floor = 0.22 * reserve_target * (1.0 + 0.22 * crowding)
             if agent.energy < death_floor and agent.stagnation > 1:
@@ -349,7 +388,7 @@ def optimize_knapsack_problem(problem: KnapsackProblem, config: MMAOKnapsackConf
             surplus = agent.energy - reserve_target
             if improvement <= 0.0 or surplus <= 0.10 * reserve_target:
                 continue
-            if len(survivors) + len(spawned) >= config.maximum_agents:
+            if surviving_count + len(spawned) >= config.maximum_agents:
                 continue
 
             subsidy = min(0.30 * reserve_target, resource_pool)

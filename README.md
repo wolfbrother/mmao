@@ -1,5 +1,13 @@
 # mmao
 
+[中文入门](https://github.com/wolfbrother/mmao/blob/main/README.zh-CN.md) · [IEEE Access article](https://doi.org/10.1109/ACCESS.2026.3752083) · [Reproducibility](https://github.com/wolfbrother/mmao/blob/main/docs/reproducibility.md)
+
+## Published article and maintenance update
+
+The IEEE Access article, **MMAO: A Unified Resource-Regulated Controller for Cross-Domain Optimization**, is available on [IEEE Xplore](https://ieeexplore.ieee.org/document/11783402). DOI: [10.1109/ACCESS.2026.3752083](https://doi.org/10.1109/ACCESS.2026.3752083).
+
+Version 1.0.1 fixes best-solution tracking, classification mask consistency, and population limits. It adds run metadata, continuous evaluation budgets, fitted classification pipelines, custom-data examples, and trajectory plotting. See [CHANGELOG.md](https://github.com/wolfbrother/mmao/blob/main/CHANGELOG.md) for behavior changes and [docs/paper-coverage.md](https://github.com/wolfbrother/mmao/blob/main/docs/paper-coverage.md) for the relationship between this package and the published experiments.
+
 MMAO is a metabolic multi-agent metaheuristic optimization framework for continuous optimization, combinatorial optimization, dynamic optimization, and classification-oriented search. It uses endogenous resource allocation, closed-loop adaptation, and parameter-light control to provide a reusable Python package for optimization research, algorithm development, and reproducible benchmarking. The repository includes benchmark loaders, command-line tools, example workflows, and research-friendly APIs for tasks such as TSP, multidimensional knapsack, feature selection, and classifier tuning.
 
 The table below summarizes how MMAO differs, at the framework level, from several well-known heuristic and plant-inspired optimizers. The goal is not to rank these methods universally, but to clarify the design dimensions on which MMAO contributes a distinct closed-loop control logic.
@@ -82,7 +90,7 @@ uv pip install -e .
 If you want TSPLIB loading support with `pip`:
 
 ```bash
-pip install -e .[io]
+pip install -e ".[io]"
 ```
 
 If you want TSPLIB loading support with `uv`:
@@ -94,7 +102,7 @@ uv pip install -e ".[io]"
 For development and testing with `pip`:
 
 ```bash
-pip install -e .[dev]
+pip install -e ".[dev]"
 ```
 
 For development and testing with `uv`:
@@ -175,14 +183,14 @@ The short names `"berlin52.tsp"` and `"mknap2.txt"` resolve to the bundled examp
 
 There are three practical ways to build on `mmao-opt`, depending on whether you want to reuse it as-is, adapt it to new problems, or modify the optimizer itself.
 
-If you only need MMAO as a research tool, you can install the package and call the public API directly. The exported interfaces in [src/mmao/api.py](D:/WorkFiles/VscodeProject/ED-RSA/mmao/src/mmao/api.py) allow you to define your own problem instances and run MMAO without changing the package source. In practice, this is the easiest path for plugging MMAO into custom benchmark scripts, engineering workflows, or evaluation pipelines.
+If you only need MMAO as a research tool, you can install the package and call the public API directly. The exported interfaces in [src/mmao/api.py](https://github.com/wolfbrother/mmao/blob/main/src/mmao/api.py) allow you to define your own problem instances and run MMAO without changing the package source. In practice, this is the easiest path for plugging MMAO into custom benchmark scripts, engineering workflows, or evaluation pipelines.
 
 If you want to adapt or improve the implementation, clone the repository and use an editable install:
 
 ```bash
 git clone https://github.com/wolfbrother/mmao.git
 cd mmao
-pip install -e .[dev]
+pip install -e ".[dev]"
 ```
 
 Or with `uv`:
@@ -222,15 +230,15 @@ mmao/
   cli.py           command-line interface
 ```
 
-## Scope of This First Release
+## Release Scope
 
-This first release focuses on a clean and usable public package interface. It already exposes the major MMAO problem families, but it is still a research-oriented release rather than a fully stabilized production library.
+Version 1.0.1 provides a research-oriented package with the major MMAO problem families, validated installation paths and documented compatibility changes.
 
 Near-term improvements will likely include:
 
 - richer benchmark adapters
 - experiment orchestration utilities
-- result serialization helpers
+- additional benchmark result formats
 - stronger dataset and problem loaders
 - broader documentation for paper-level reproducibility
 
@@ -253,7 +261,20 @@ For public trust and regression control, CI is defined in `.github/workflows/ci.
 
 ## Citation
 
-Please use [CITATION.cff](D:/WorkFiles/VscodeProject/ED-RSA/mmao/CITATION.cff) for software citation metadata.
+The recommended journal citation is provided below. The author-supplied publication metadata currently lists pages 1–12 and has no volume or issue. Additional BibTeX is available in [references.bib](https://github.com/wolfbrother/mmao/blob/main/references.bib).
+
+```bibtex
+@ARTICLE{11783402,
+  author={Xu, Jinliang and Li, Bingqi and Ma, Liping and Zhu, Runkai and Nie, Fanjie and Li, Jin},
+  journal={IEEE Access},
+  title={MMAO: A Unified Resource-Regulated Controller for Cross-Domain Optimization},
+  year={2026},
+  pages={1-12},
+  doi={10.1109/ACCESS.2026.3752083}
+}
+```
+
+Please use [CITATION.cff](https://github.com/wolfbrother/mmao/blob/main/CITATION.cff) for software citation metadata.
 
 Recommended practice:
 
@@ -263,5 +284,13 @@ Recommended practice:
 
 Additional orientation documents:
 
-- [docs/paper-coverage.md](D:/WorkFiles/VscodeProject/ED-RSA/mmao/docs/paper-coverage.md)
-- [docs/reproducibility.md](D:/WorkFiles/VscodeProject/ED-RSA/mmao/docs/reproducibility.md)
+- [docs/paper-coverage.md](https://github.com/wolfbrother/mmao/blob/main/docs/paper-coverage.md)
+- [docs/reproducibility.md](https://github.com/wolfbrother/mmao/blob/main/docs/reproducibility.md)
+
+## Copyright and license
+
+Copyright (c) 2026 Jinliang Xu.
+
+Author and contact — Jinliang Xu, `jlxufly@gmail.com`, `xujinliang@caict.ac.cn`.
+
+This project is licensed under the Apache License, Version 2.0. Full terms and attribution are available in the [LICENSE](https://github.com/wolfbrother/mmao/blob/main/LICENSE) and [NOTICE](https://github.com/wolfbrother/mmao/blob/main/NOTICE) files.

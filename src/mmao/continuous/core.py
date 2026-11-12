@@ -1,11 +1,30 @@
+# Copyright (c) 2026 Jinliang Xu
+# Author: Jinliang Xu
+# Email: jlxufly@gmail.com
+# Email: xujinliang@caict.ac.cn
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 import random
 
 from ..common import clamp, median_upper_scale
 from .benchmarks import ContinuousProblem
+from ..common.validation import integer, validate_config
 
 
 Vector = list[float]
@@ -32,6 +51,7 @@ class MMAOContinuousConfig:
     branch_energy_threshold: float = 4.2
     branch_pool_threshold: float = 2.6
     respawn_floor: int = 4
+    max_evaluations: int | None = None
 
 
 @dataclass
@@ -131,7 +151,31 @@ def optimize_continuous_problem(
     problem: ContinuousProblem,
     config: MMAOContinuousConfig,
 ) -> dict[str, object]:
-    rng = random.Random(config.seed)
+    validate_config(config)
+    if config.max_evaluations is not None:
+        integer("max_evaluations", config.max_evaluations, config.initial_agents)
+    evaluation_count = 0
+    evaluated_best = math.inf
+    evaluated_position: Vector = []
+    original_problem = problem
+
+    def evaluate(position: Vector) -> float:
+        nonlocal evaluation_count, evaluated_best, evaluated_position
+        value = original_problem.evaluate(position)
+        evaluation_count += 1
+        if not math.isfinite(value):
+            raise ValueError("The objective must return a finite value.")
+        if value < evaluated_best:
+            evaluated_best = value
+            evaluated_position = position[:]
+        return value
+
+    problem = replace(problem, objective=evaluate)
+
+    def can_evaluate(count: int = 1) -> bool:
+        return config.max_evaluations is None or evaluation_count + count <= config.max_evaluations
+
+    rng = random.Random(int(config.seed))
     dimensions = problem.dimension
     domain_scale = math.sqrt(
         sum((upper - lower) ** 2 for lower, upper in problem.bounds) / max(1, dimensions)
@@ -149,9 +193,13 @@ def optimize_continuous_problem(
     global_best_position = global_best_agent.best_position[:]
 
     def record(iteration: int) -> None:
+        nonlocal global_best_fitness, global_best_position
+        global_best_fitness = evaluated_best
+        global_best_position = evaluated_position[:]
         history.append(
             {
                 "iteration": iteration,
+                "nfev": evaluation_count,
                 "best_fitness": float(global_best_fitness),
                 "resource_pool": float(resource_pool),
                 "success_rate": float(sum(1 for agent in agents if agent.last_gain > 0.0) / len(agents)),
@@ -164,6 +212,8 @@ def optimize_continuous_problem(
     record(0)
 
     for iteration in range(1, config.iterations + 1):
+        if not can_evaluate(3):
+            break
         global_best = min(agents, key=lambda agent: agent.best_fitness)
         center = mean_position(agents)
         mean_spread = math.sqrt(
@@ -173,6 +223,8 @@ def optimize_continuous_problem(
         scale = median_upper_scale(recent_gains[-config.progress_window :], domain_scale * 0.02)
 
         for agent in agents:
+            if not can_evaluate(3):
+                break
             current_position = agent.position[:]
             current_fitness = agent.fitness
             personal_gap = [best - current for best, current in zip(agent.best_position, current_position)]
@@ -280,11 +332,15 @@ def optimize_continuous_problem(
             reverse=True,
         )
         for parent in branch_candidates:
+            if not can_evaluate():
+                break
             if len(agents) >= config.maximum_agents:
                 break
             if resource_pool < config.branch_pool_threshold or parent.energy < config.branch_energy_threshold:
                 continue
             for _ in range(config.branch_children):
+                if not can_evaluate():
+                    break
                 if len(agents) >= config.maximum_agents or resource_pool < 0.8:
                     break
                 child_energy = min(config.initial_energy * 0.75, resource_pool)
@@ -303,6 +359,8 @@ def optimize_continuous_problem(
         while len(agents) < config.minimum_agents or (
             len(agents) < min(config.respawn_floor, config.maximum_agents) and resource_pool > 1.2
         ):
+            if not can_evaluate():
+                break
             if len(agents) >= config.maximum_agents:
                 break
             best_agent = min(agents, key=lambda agent: agent.best_fitness)
@@ -326,4 +384,6 @@ def optimize_continuous_problem(
         "best_position": global_best_position,
         "best_fitness": float(global_best_fitness),
         "history": history,
+        "nfev": evaluation_count,
+        "termination_reason": "max_evaluations" if history[-1]["iteration"] < config.iterations else "iterations",
     }
