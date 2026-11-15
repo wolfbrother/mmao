@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add the separate `ResourceControlConfig` and `optimize_resource_controlled` research API for versioned common-kernel F/I/M/D comparisons.
+- Record actual evaluations and communal resource-ledger terms, with bounded populations and independently derived random streams.
+- Add budget, repeatability, initialization-pairing and allocation-floor regression checks for the research interface.
+
 ## 1.0.1 — prepared 2026-11-12
 
 - Add Jinliang Xu copyright headers and both contact addresses to Python source files and project configuration, and ship the copyright NOTICE with distributions.

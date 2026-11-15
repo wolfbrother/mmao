@@ -57,6 +57,13 @@ This repository is intended to make MMAO easier to verify, test, and reuse. It i
 
 ## Installation
 
+The local development tree also exposes the unreleased `ResourceControlConfig`
+and `optimize_resource_controlled` research interface. Its implementation identity
+is `resource-control-v1`, supporting shared-kernel F/I/M/D comparisons, objective
+call traces, and explicit communal accounting. The ESWA experiment project uses
+this editable local source and records source fingerprints. Findings from that
+study refer to the declared research realization.
+
 Install from PyPI with `pip`:
 
 ```bash

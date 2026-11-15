@@ -27,6 +27,7 @@ from .api import (
 )
 from .classification import ClassificationProblem, MMAOClassificationConfig, load_builtin_dataset
 from .continuous import ContinuousProblem, MMAOContinuousConfig, rastrigin_problem, sphere_problem
+from .continuous.controlled import ResourceControlConfig, optimize_resource_controlled
 from .discrete import KnapsackProblem, MMAOKnapsackConfig, MMAOTSPConfig, TSPProblem
 from .dynamic import DynamicOptimizationProblem, MMAODynamicConfig, make_dynamic_problem
 from .io import load_orlib_mkp_instance, load_orlib_mkp_instances, load_tsplib_problem
@@ -40,6 +41,8 @@ from .results import save_classification_model, summarize_result, write_result_j
 from .version import __version__
 
 __all__ = [
+    "ResourceControlConfig",
+    "optimize_resource_controlled",
     "__version__",
     "bundled_orlib_path",
     "bundled_tsplib_path",
